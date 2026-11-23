@@ -1,12 +1,275 @@
-import {useEffect,useMemo,useState} from 'react';import {uid,toMarkdown,csv} from './logic';import './styles.css';
-const cfg={"slug":"algorithm-visualizer","name":"Motion Sort","purpose":"Visual sorting and searching demonstrations with controls for size, speed, pause, reset, and stepping.","kind":"algorithm","fields":["Algorithm","input size","speed","goal","notes"],"accent":"orange"} as const;const pages=[['home','Home'],['workspace','Visualizer'],['guide','Algorithm guide'],['examples','Comparisons'],['reference','Complexity reference'],['help','About']] as const;type Page=typeof pages[number][0];type Item={id:string;title:string;createdAt:string;[key:string]:string};const key='local-portfolio:'+cfg.slug;const makeDemo=():Item[]=>['Field note — Alder','Follow-up — Miro','Review — Sol','Plan — Juniper','Archive — Nia','Decision — Rowan','Reminder — Theo','Research — Imani','Checklist — Ellis','Exception — Saffron'].map((title,i)=>({id:'demo-'+i,title,createdAt:new Date(Date.now()-i*86400000).toISOString(),[cfg.fields[1]]:['In focus','Scheduled','Reviewed','Waiting','Reference'][i%5],[cfg.fields[2]]:['Ready','Needs review','Complete','Paused','Archived'][i%5],[cfg.fields[3]]:new Date(Date.now()+(i-3)*86400000).toISOString().slice(0,10),[cfg.fields[4]]:i===4?'A longer fictional note showing a realistic exception, the decision taken, and what should be checked before the record is used again.':'Fictional demo data for a populated local workspace.'}));function download(n:string,s:string,t='text/plain'){const x=document.createElement('a');x.href=URL.createObjectURL(new Blob([s],{type:t}));x.download=n;x.click();URL.revokeObjectURL(x.href)}
-export default function App(){const requested=location.hash.slice(1);const [page,setPage]=useState<Page|'notfound'>(()=>pages.some(([id])=>id===requested)?requested as Page:requested?'notfound':'home');const [records,setRecords]=useState<Item[]>(()=>{try{return JSON.parse(localStorage.getItem(key)||'null')||makeDemo()}catch{return makeDemo()}});const [form,setForm]=useState<Record<string,string>>({});const [query,setQuery]=useState('');const [notice,setNotice]=useState('');const [answer,setAnswer]=useState('');const [editing,setEditing]=useState<Item|null>(null);useEffect(()=>{document.title=(page==='home'?cfg.name:page==='notfound'?'Page not found':cfg.name+' — '+page);if(page!=='notfound')location.hash=page},[page]);const save=(x:Item[])=>{setRecords(x);localStorage.setItem(key,JSON.stringify(x))};const filtered=useMemo(()=>records.filter(r=>JSON.stringify(r).toLowerCase().includes(query.toLowerCase())),[records,query]);const add=(ev:React.FormEvent)=>{ev.preventDefault();const title=form[cfg.fields[0]]?.trim();if(!title){setNotice('Add a '+cfg.fields[0].toLowerCase()+' before saving.');return}const next={id:editing?.id||uid(),title,createdAt:editing?.createdAt||new Date().toISOString()} as Item;cfg.fields.forEach(f=>next[f]=form[f]||'');save(editing?records.map(r=>r.id===editing.id?next:r):[next,...records]);setForm({});setEditing(null);setNotice(editing?'Record updated locally.':'Saved locally. You can now find it in the archive or export it.')};const importJson=async(file?:File)=>{if(!file)return;try{const parsed=JSON.parse(await file.text());if(!Array.isArray(parsed)||!parsed.every(x=>x&&typeof x.title==='string'))throw new Error();save(parsed);setNotice('Imported '+parsed.length+' records into this browser.')}catch{setNotice('That file is not a valid export. Your existing records were left unchanged.')}};return <div className={'app '+cfg.accent}><div className="shell"><header><div className="brand"><small>LOCAL EDITION</small>{cfg.name}</div><nav aria-label="Primary">{pages.map(([id,label])=><button className={page===id?'active':''} key={id} onClick={()=>setPage(id)}>{label}</button>)}</nav></header>{page==='home'&&<Home records={records} open={()=>setPage('workspace')}/>} {page==='workspace'&&<Workspace/>}{page==='notfound'&&<NotFound/>}{page==='guide'&&<Guide title="Algorithm guide"/>}{page==='examples'&&<Examples/>}{page==='reference'&&<Reference/>}{page==='help'&&<Help/>}</div></div>;
-function Home({records,open}:{records:Item[];open:()=>void}){return <><section className="hero"><div><p className="eyebrow">A CLEARER WAY TO WORK LOCALLY</p><h1>Motion Sort keeps the important details <i>findable.</i></h1><p>Algorithms are easier to understand when each comparison and move is visible rather than hidden in a finished result.</p><div className="actions"><button className="primary" onClick={open}>Open visualizer</button><button onClick={()=>download(cfg.slug+'-demo.md',toMarkdown(cfg.name,records))}>Export demo</button></div></div><aside className="preview"><div className="preview-head">LIVE SAMPLE <span>● DEMO DATA</span></div><div className="preview-title">What is ready today</div>{records.slice(0,3).map((r,i)=><div className="peek" key={r.id}><div><b>{r.title}</b><br/><small>{r[cfg.fields[1]]}</small></div><span>{i===0?'NOW':'SAVED'}</span></div>)}<div className="preview-foot">No account. No sync. Export when you choose.</div></aside></section><section className="section"><p className="eyebrow">01 / FIRST RECORD</p><h2>Begin with a record you will need again.</h2><p>Choose a data set, step the visual state, then compare the explanation with the operation you just saw.</p><div className="card-grid"><div className="info-card"><strong>1. Name the detail</strong><p>Use the first field for the thing you will search for later, rather than a vague catch-all.</p></div><div className="info-card"><strong>2. Add context</strong><p>Record the practical facts beside it: status, timing, and the note that explains the decision.</p></div><div className="info-card"><strong>3. Review deliberately</strong><p>Search your local history, export when needed, and remove data that is no longer useful.</p></div></div></section><section className="section story"><p className="eyebrow">02 / WHY THIS RECORD EXISTS</p><h2>Small details are where useful decisions begin.</h2><p>{cfg.purpose} This is deliberately a local record rather than a social feed, an account portal, or an automated recommendation. It gives you a calm place to capture the exact fact, its context, and the practical next question while you still remember why it matters.</p><p>Every entry is searchable by the words you wrote. Use concise fields for things you expect to compare later, then use the note for nuance: an exception, an uncertainty, or the reason a future version of you should pause before acting.</p></section><section className="section"><p className="eyebrow">03 / THE CURRENT DESK</p><h2>Ten examples, clearly fictional.</h2><p>The first records are labelled demo data. They exist to demonstrate active, scheduled, reviewed, and archived states—never to imply real people, transactions, outcomes, or activity.</p><div className="card-grid">{records.slice(0,6).map((r,i)=><div className="info-card" key={r.id}><strong>{String(i+1).padStart(2,'0')} · {r.title}</strong><p>{r[cfg.fields[1]]} · {r[cfg.fields[2]]}<br/>{r[cfg.fields[4]]}</p></div>)}</div></section><section className="section"><p className="eyebrow">04 / A PRACTICAL LOOP</p><h2>Capture. Review. Carry forward.</h2><div className="card-grid"><div className="info-card"><strong>Capture</strong><p>Open the workspace when the detail is fresh. The required title prevents a record that cannot be found later.</p></div><div className="info-card"><strong>Review</strong><p>Search by a name, category, status, or note. Empty results are an invitation to change the query, not a dead end.</p></div><div className="info-card"><strong>Carry forward</strong><p>Export a Markdown or CSV copy before a handoff, a planning session, or a browser reset. Local data is yours to move.</p></div></div></section><section className="section"><p className="eyebrow">05 / WHAT THE TOOL DOES NOT DO</p><h2>Clear boundaries are part of the design.</h2><p>This app does not silently synchronize, infer facts, send reminders, or make a recommendation for you. Dates, labels, financial figures, health-related notes, disposal guidance, and any decisions based on them depend entirely on the information you enter and the context you verify.</p></section><section className="section"><p className="eyebrow">06 / KEEP A PORTABLE COPY</p><h2>Local-first should never mean trapped.</h2><p>Use JSON import and export for a browser-local backup, or CSV and Markdown when you need a readable copy. Imported JSON replaces the current local collection only after the file is successfully parsed; malformed files leave the saved records unchanged and show a clear error.</p></section><section className="section"><p className="eyebrow">07 / CONTINUE IN THE TOOL</p><h2>Use the real workspace, not a mock-up.</h2><p>The preview above is built from the same saved records used in the workspace. Open it to add, edit, remove, filter, import, and export local data.</p><div className="actions"><button className="primary" onClick={open}>Open workspace</button></div></section><footer className="section footer"><p className="eyebrow">08 / LOCAL PROJECT NOTES</p><p>This product stores its data in the active browser profile. Read the guide and limitations before relying on it for a consequential decision.</p></footer></>}
-function Workspace(){return <section className="workspace"><div className="toolbar"><input aria-label="Search records" value={query} onChange={e=>setQuery(e.target.value)} placeholder={'Search '+cfg.name}/><button onClick={()=>download(cfg.slug+'.md',toMarkdown(cfg.name,records))}>Export Markdown</button><button onClick={()=>download(cfg.slug+'.csv',csv(records),'text/csv')}>Export CSV</button><button onClick={()=>download(cfg.slug+'.json',JSON.stringify(records,null,2),'application/json')}>Export JSON</button><label className="import">Import JSON<input type="file" accept="application/json" onChange={e=>importJson(e.target.files?.[0])}/></label></div><div className="grid"><form onSubmit={add}><h2>Add algorithm</h2>{cfg.fields.map((f,i)=><label key={f}>{f}<input required={i===0} value={form[f]||''} onChange={e=>setForm({...form,[f]:e.target.value})} placeholder={'Enter '+f.toLowerCase()}/></label>)}<button className="primary">{editing?'Save changes':'Save record'}</button>{editing&&<button type="button" onClick={()=>{setEditing(null);setForm({})}}>Cancel edit</button>}{notice&&<p className="notice" role="status">{notice}</p>}</form><article className="records"><h2>{filtered.length} records</h2>{filtered.length===0?<p className="empty">No records match that search. Clear the search or create the first local record.</p>:filtered.map(r=><section className="card" key={r.id}><div><h3>{r.title}</h3>{cfg.fields.slice(1).map(f=><p key={f}><b>{f}</b> {r[f]||'—'}</p>)}</div><div><button onClick={()=>{setEditing(r);const values:Record<string,string>={};cfg.fields.forEach(f=>values[f]=r[f]||'');setForm(values);window.scrollTo({top:0,behavior:'smooth'})}}>Edit</button><button onClick={()=>{save(records.filter(x=>x.id!==r.id));setNotice('Record removed from this browser.')}}>Delete</button></div></section>)}</article></div><Special/></section>}
-function NotFound(){return <section className="section"><p className="eyebrow">404 / LOCAL ROUTE</p><h2>That page is not in this edition.</h2><p>Use the navigation to return to a known section.</p><button className="primary" onClick={()=>setPage('home')}>Return home</button></section>}
-function Guide({title}:{title:string}){return <Content kicker="02 / FIELD GUIDE" title={title} body="comparison, swap, search, complexity are the working vocabulary in this tool. The guide does not prescribe a single right process; it explains what each field records, why it is there, and how to keep the record useful over time." cards={[['Use plain language','Write the term that a future version of you will recognise quickly.'],['Keep dates practical','Use a date only when it helps you decide what to do or review next.'],['Separate facts from notes','Use short fields for filtering and the note for the detail that does not fit a label.']]}/>}
-function Examples(){return <Content kicker="03 / WORKED EXAMPLES" title="A record with enough context." body="The sample records are fictional and labelled as demo data. They show the difference between a title that can be found, structured fields that can be scanned, and a note that preserves the reason behind a decision." cards={[['A current item','Marked In focus, with a near date and a concise note.'],['A scheduled item','Has a future date so it appears when you are planning ahead.'],['An edge case','Uses a longer note to prove that more context remains readable.']]}/>}
-function Reference(){return <Content kicker="04 / METHOD" title="How this local tool handles information." body="Motion Sort stores records in this browser using localStorage. Search runs against the saved local data. Markdown and CSV exports are created in your browser. There is no account, server synchronization, automatic backup, or claim that this record is authoritative outside the information you enter." cards={[['Local first','Your records remain in the active browser profile until you export or remove them.'],['Simple exports','Exports are designed to be readable and portable, not a full database backup format.'],['Human review','Dates, amounts, labels, and reminders depend on the data you enter and should be checked before acting.']]}/>}
-function Help(){return <section className="section"><p className="eyebrow">05 / HELP & LIMITS</p><h2>Useful boundaries make a tool more trustworthy.</h2><div className="faq"><details open><summary>Where is my data stored?</summary><p>In localStorage for this browser profile. Clearing browser data may remove it; use an export for a copy you control.</p></details><details><summary>Is the demo data real?</summary><p>No. It is fictional sample material designed to show populated, long-text, status, and archive states.</p></details><details><summary>What happens when a form is incomplete?</summary><p>The first field is required. The form gives a plain-language message and keeps the entered values available to correct.</p></details><details><summary>Can this replace specialist advice?</summary><p>No. It is a personal organization aid. The limitations and relevant disclaimers should guide how you use the records.</p></details></div></section>}
-function Content({kicker,title,body,cards}:{kicker:string;title:string;body:string;cards:string[][]}){return <section className="section"><p className="eyebrow">{kicker}</p><h2>{title}</h2><p>{body}</p><div className="card-grid">{cards.map(c=><div className="info-card" key={c[0]}><strong>{c[0]}</strong><p>{c[1]}</p></div>)}</div></section>}
-function Special(){if((cfg.kind as string)==='algorithm')return <section className="lab"><h2>Visible operations</h2><p>Use these controls to see an ordered set change. They are deliberately small: the explanation matters more than spectacle.</p><button onClick={()=>setAnswer('Values sorted: 4, 7, 12, 19')}>Sort sample</button><button onClick={()=>setAnswer('One comparison explained: 12 is greater than 7, so it moves after 7.')}>Explain step</button><p role="status">{answer}</p></section>;if((cfg.kind as string)==='garden')return <section className="lab"><h2>Bed grid</h2><div className="bed">{Array.from({length:12},(_,i)=><button key={i} onClick={()=>setAnswer('Plant marker placed in bed cell '+(i+1))}>{answer.includes(String(i+1))?'●':'+'}</button>)}</div><p role="status">{answer||'Select a cell to place a marker.'}</p></section>;return <section className="lab"><h2>Practice note</h2><p>Use this local workspace with the guide alongside it. A good record is specific enough to help later and short enough to keep current.</p></section>}}
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Field, Landing, NotFound, Notice, PageHead, Shell, usePersistentState, useRoute } from './shared/ui';
+import { ALGOS, makeInput, parseInput, run, type Frame, type Preset } from './lib/algorithms';
+
+const KEY = 'motion-sort:settings';
+const NAV = [
+  { to: '/', label: 'Overview' },
+  { to: '/visualize', label: 'Visualise' },
+  { to: '/race', label: 'Race' },
+  { to: '/compare', label: 'Compare' },
+];
+const PRESETS: [Preset, string][] = [['random', 'Random'], ['nearly', 'Nearly sorted'], ['reversed', 'Reversed'], ['sorted', 'Already sorted'], ['few', 'Few unique values']];
+const SORTS = ALGOS.filter((a) => a.kind === 'sort');
+const SPEEDS: [number, string][] = [[600, 'Slow'], [220, 'Medium'], [60, 'Fast'], [12, 'Very fast']];
+
+interface Settings {
+  algo: string;
+  size: number;
+  preset: Preset;
+  speed: number;
+  raceA: string;
+  raceB: string;
+}
+
+export default function App() {
+  const [route] = useRoute();
+  const [s, setS] = usePersistentState<Settings>(KEY, { algo: 'quick', size: 24, preset: 'random', speed: 220, raceA: 'insertion', raceB: 'merge' });
+  let page: ReactNode;
+  if (route === '/') page = <Home />;
+  else if (route === '/visualize') page = <Visualize s={s} setS={setS} />;
+  else if (route === '/race') page = <Race s={s} setS={setS} />;
+  else if (route === '/compare') page = <Compare />;
+  else page = <NotFound />;
+  return (
+    <Shell name="Motion Sort" wordmark={['Motion', 'Sort']} nav={NAV} route={route} cta={{ to: '/visualize', label: 'Open the visualiser' }} footerNote="Every frame comes from running the real algorithm on your data, in your browser.">
+      {page}
+    </Shell>
+  );
+}
+
+/* ---------- Player ---------- */
+function usePlayer(frames: Frame[], speed: number) {
+  const [i, setI] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => { setI(0); setPlaying(false); }, [frames]);
+  useEffect(() => {
+    if (!playing) return;
+    const t = setInterval(() => setI((x) => { if (x >= frames.length - 1) { setPlaying(false); return x; } return x + 1; }), speed);
+    return () => clearInterval(t);
+  }, [playing, speed, frames.length]);
+  return { i, setI, playing, setPlaying, frame: frames[Math.min(i, frames.length - 1)], last: frames.length - 1 };
+}
+
+export function Bars({ frame, compact, label }: { frame: Frame; compact?: boolean; label: string }) {
+  const max = Math.max(1, ...frame.array);
+  return (
+    <div className={`bars-viz ${compact ? 'is-compact' : ''}`} role="img" aria-label={`${label}: ${frame.array.join(', ')}`}>
+      {frame.array.map((v, k) => {
+        const cls = frame.write.includes(k) ? 'w' : frame.compare.includes(k) ? 'c' : frame.pivot === k ? 'p' : frame.sorted.includes(k) ? 's' : frame.range && (k < frame.range[0] || k > frame.range[1]) ? 'o' : '';
+        return <span key={k} className={`b ${cls}`} style={{ height: `${Math.max(2, (v / max) * 100)}%` }}>{!compact && frame.array.length <= 24 && <i>{v}</i>}</span>;
+      })}
+    </div>
+  );
+}
+
+function Legend() {
+  return <p className="legend"><span><i className="k-c" />Comparing</span><span><i className="k-w" />Writing / swapping</span><span><i className="k-p" />Pivot / current minimum</span><span><i className="k-s" />In final place</span><span><i className="k-o" />Outside the active range</span></p>;
+}
+
+function HeroPreview() {
+  const frames = useMemo(() => run('quick', makeInput(28, 'random', mulberry(7))), []);
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setI(frames.length - 1); return; }
+    const t = setInterval(() => setI((x) => (x >= frames.length - 1 ? 0 : x + 1)), 70);
+    return () => clearInterval(t);
+  }, [frames]);
+  const f = frames[i];
+  return (
+    <div className="hero-ms">
+      <div className="row-between"><strong className="hero-ms-title">Quicksort</strong><span className="mono small">{f.comparisons} comparisons · {f.writes} writes</span></div>
+      <Bars frame={f} compact label="Quicksort animation on demo data" />
+      <p className="small muted hero-note">{f.note}</p>
+    </div>
+  );
+}
+
+function mulberry(seed: number) {
+  return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+function Home() {
+  return (
+    <Landing
+      eyebrow="Algorithm visualiser"
+      title={<>Watch the algorithm <em>think.</em></>}
+      lead="Six sorting algorithms and two searches, run on real data and recorded one comparison at a time. Step through them, read the line of pseudocode that’s running, and race two side by side."
+      primary={{ href: '#/visualize', label: 'Open the visualiser' }}
+      secondary={{ href: '#/race', label: 'Race two algorithms' }}
+      previewLabel="Quicksort — running live"
+      preview={<HeroPreview />}
+      compact
+      steps={[
+        { title: 'Choose', body: 'Bubble, insertion, selection, merge, quick or heap sort — or a linear or binary search.' },
+        { title: 'Shape the data', body: 'Random, nearly sorted, reversed, already sorted, few unique values, or your own numbers.' },
+        { title: 'Step or play', body: 'Pause anywhere, step back, and watch the comparison and write counters climb.' },
+      ]}
+      features={[
+        { title: 'Real counts', body: 'Comparisons and writes are counted from the actual run, so you can see O(n²) versus O(n log n).' },
+        { title: 'Pseudocode in sync', body: 'The line being executed is highlighted next to the bars.' },
+        { title: 'Best and worst cases', body: 'Try quicksort on already-sorted data, or insertion sort on nearly-sorted data.' },
+        { title: 'Keyboard control', body: 'Space plays and pauses; the arrow keys step one frame.' },
+      ]}
+      note="Colours are paired with a legend and a text description of each step."
+      closing={{ title: <>Sorting, <em>slowed right down.</em></>, action: { href: '#/visualize', label: 'Start visualising' } }}
+    />
+  );
+}
+
+/* ---------- Visualise ---------- */
+function DataControls({ s, setS, custom, setCustom, err, onApply }: { s: Settings; setS: (x: Settings) => void; custom: string; setCustom: (x: string) => void; err: string | null; onApply: () => void }) {
+  return (
+    <div className="card stack">
+      <div className="filters">
+        <Field label="Data">{(p) => <select {...p} value={s.preset} onChange={(e) => setS({ ...s, preset: e.target.value as Preset })}>{PRESETS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>}</Field>
+        <Field label={`Size: ${s.size}`}>{(p) => <input {...p} type="range" min={5} max={64} value={s.size} onChange={(e) => setS({ ...s, size: Number(e.target.value) })} />}</Field>
+        <Field label="Speed">{(p) => <select {...p} value={s.speed} onChange={(e) => setS({ ...s, speed: Number(e.target.value) })}>{SPEEDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}</Field>
+      </div>
+      <form className="filters" onSubmit={(e) => { e.preventDefault(); onApply(); }}>
+        <Field label="Or use your own numbers" className="grow" hint="2–64 values from 0 to 999" error={err}>{(p) => <input {...p} value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="e.g. 42, 7, 19, 3, 88" />}</Field>
+        <button className="btn" type="submit">Use these</button>
+      </form>
+    </div>
+  );
+}
+
+function Controls({ p }: { p: ReturnType<typeof usePlayer> }) {
+  return (
+    <div className="controls row">
+      <button type="button" className="btn btn-sm" aria-label="First step" onClick={() => p.setI(0)} disabled={p.i === 0}>⏮</button>
+      <button type="button" className="btn btn-sm" aria-label="Previous step" onClick={() => p.setI(Math.max(0, p.i - 1))} disabled={p.i === 0}>◀</button>
+      <button type="button" className="btn btn-primary" onClick={() => { if (p.i >= p.last) p.setI(0); p.setPlaying(!p.playing); }}>{p.playing ? 'Pause' : p.i >= p.last ? 'Replay' : 'Play'}</button>
+      <button type="button" className="btn btn-sm" aria-label="Next step" onClick={() => p.setI(Math.min(p.last, p.i + 1))} disabled={p.i >= p.last}>▶</button>
+      <button type="button" className="btn btn-sm" aria-label="Last step" onClick={() => p.setI(p.last)} disabled={p.i >= p.last}>⏭</button>
+      <label className="scrub"><span className="sr-only">Step</span><input type="range" min={0} max={p.last} value={p.i} onChange={(e) => { p.setPlaying(false); p.setI(Number(e.target.value)); }} /></label>
+      <span className="mono small" data-testid="step">Step {p.i} / {p.last}</span>
+    </div>
+  );
+}
+
+function Visualize({ s, setS }: { s: Settings; setS: (x: Settings) => void }) {
+  const [custom, setCustom] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const [own, setOwn] = useState<number[] | null>(null);
+  const [seed, setSeed] = useState(1);
+  const [target, setTarget] = useState<number | null>(null);
+  const info = ALGOS.find((a) => a.key === s.algo)!;
+  const input = useMemo(() => own ?? makeInput(s.size, s.preset, mulberry(seed)), [own, s.size, s.preset, seed]);
+  const tgt = target ?? input[Math.floor(input.length / 3)];
+  const frames = useMemo(() => run(s.algo, input, tgt), [s.algo, input, tgt]);
+  const p = usePlayer(frames, s.speed);
+  const f = p.frame;
+  function onKey(e: React.KeyboardEvent) {
+    if ((e.target as HTMLElement).closest('input, select, textarea')) return;
+    if (e.key === ' ') { e.preventDefault(); p.setPlaying(!p.playing); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); p.setI(Math.min(p.last, p.i + 1)); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); p.setI(Math.max(0, p.i - 1)); }
+  }
+  function apply() {
+    const r = parseInput(custom);
+    setErr(r.error ?? null);
+    if (r.values) setOwn(r.values);
+  }
+  return (
+    <div className="stack" onKeyDown={onKey}>
+      <PageHead eyebrow={info.kind === 'sort' ? 'Sorting' : 'Searching'} title={<>{info.name}</>} description={info.blurb} actions={<button type="button" className="btn" onClick={() => { setOwn(null); setSeed(seed + 1); }}>New data</button>} />
+      <div className="algo-pick" role="radiogroup" aria-label="Algorithm">
+        {ALGOS.map((a) => <button key={a.key} type="button" role="radio" aria-checked={s.algo === a.key} className="btn btn-sm" onClick={() => setS({ ...s, algo: a.key })}>{a.name}</button>)}
+      </div>
+      <DataControls s={s} setS={(x) => { setOwn(null); setS(x); }} custom={custom} setCustom={setCustom} err={err} onApply={apply} />
+      {own && <Notice kind="info">Using your {own.length} numbers. Change “Data” or press “New data” to go back to generated data.</Notice>}
+      {info.kind === 'search' && <div className="card filters"><Field label="Search for">{(x) => <select {...x} value={tgt} onChange={(e) => setTarget(Number(e.target.value))}>{[...new Set(input)].sort((a, b) => a - b).map((v) => <option key={v} value={v}>{v}</option>)}<option value={1000}>1000 (not in list)</option></select>}</Field></div>}
+      <div className="layout-main">
+        <section className="card stack" aria-labelledby="viz-t">
+          <h2 id="viz-t" className="sr-only">Visualisation</h2>
+          <Bars frame={f} label={`Step ${p.i}`} />
+          <p className="step-note" aria-live="polite" data-testid="note">{f.note}</p>
+          <Controls p={p} />
+          <Legend />
+        </section>
+        <aside className="card stack">
+          <div className="stats mini">
+            <div className="stat"><span className="stat-label">Comparisons</span><span className="stat-value" data-testid="cmp">{f.comparisons}</span></div>
+            <div className="stat"><span className="stat-label">Writes</span><span className="stat-value">{f.writes}</span></div>
+          </div>
+          <div className="code" role="list" aria-label="Pseudocode">{info.code.map((l, k) => <code key={k} role="listitem" className={k === f.line ? 'on' : ''} aria-current={k === f.line ? 'step' : undefined}>{l}</code>)}</div>
+          <dl className="cx"><dt>Best</dt><dd>{info.best}</dd><dt>Average</dt><dd>{info.average}</dd><dt>Worst</dt><dd>{info.worst}</dd><dt>Extra space</dt><dd>{info.space}</dd>{info.stable != null && <><dt>Stable</dt><dd>{info.stable ? 'Yes' : 'No'}</dd></>}</dl>
+          <p className="small muted">Space: play/pause · ← →: step</p>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Race ---------- */
+function Race({ s, setS }: { s: Settings; setS: (x: Settings) => void }) {
+  const [seed, setSeed] = useState(1);
+  const sorts = SORTS;
+  const input = useMemo(() => makeInput(s.size, s.preset, mulberry(seed)), [s.size, s.preset, seed]);
+  const fa = useMemo(() => run(s.raceA, input), [s.raceA, input]);
+  const fb = useMemo(() => run(s.raceB, input), [s.raceB, input]);
+  const longest = useMemo(() => Array.from({ length: Math.max(fa.length, fb.length) }, (_, k) => fa[Math.min(k, fa.length - 1)]), [fa, fb]);
+  const p = usePlayer(longest, s.speed);
+  const A = fa[Math.min(p.i, fa.length - 1)], B = fb[Math.min(p.i, fb.length - 1)];
+  const doneA = p.i >= fa.length - 1, doneB = p.i >= fb.length - 1;
+  const name = (k: string) => ALGOS.find((a) => a.key === k)!.name;
+  return (
+    <div className="stack">
+      <PageHead eyebrow="Race" title={<>Same data, <em>two algorithms.</em></>} description="Each tick is one recorded step. The one with fewer steps finishes first." actions={<button type="button" className="btn" onClick={() => setSeed(seed + 1)}>New data</button>} />
+      <div className="card filters">
+        <Field label="Left">{(x) => <select {...x} value={s.raceA} onChange={(e) => setS({ ...s, raceA: e.target.value })}>{sorts.map((a) => <option key={a.key} value={a.key}>{a.name}</option>)}</select>}</Field>
+        <Field label="Right">{(x) => <select {...x} value={s.raceB} onChange={(e) => setS({ ...s, raceB: e.target.value })}>{sorts.map((a) => <option key={a.key} value={a.key}>{a.name}</option>)}</select>}</Field>
+        <Field label="Data">{(x) => <select {...x} value={s.preset} onChange={(e) => setS({ ...s, preset: e.target.value as Preset })}>{PRESETS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>}</Field>
+        <Field label={`Size: ${s.size}`}>{(x) => <input {...x} type="range" min={5} max={64} value={s.size} onChange={(e) => setS({ ...s, size: Number(e.target.value) })} />}</Field>
+      </div>
+      <div className="grid-2">
+        {[[s.raceA, A, doneA, fa], [s.raceB, B, doneB, fb]].map(([k, f, done, all], n) => (
+          <section key={n} className={`card stack race ${done ? 'is-done' : ''}`} aria-label={name(k as string)}>
+            <div className="row-between"><h2 className="h3">{name(k as string)}</h2>{done && <span className="badge badge-ok">Finished in {(all as Frame[]).length - 1} steps</span>}</div>
+            <Bars frame={f as Frame} compact label={name(k as string)} />
+            <p className="mono small" data-testid={`race-${n}`}>{(f as Frame).comparisons} comparisons · {(f as Frame).writes} writes</p>
+          </section>
+        ))}
+      </div>
+      <div className="card"><Controls p={p} /></div>
+      {doneA && doneB && <Notice kind="success">{fa.length === fb.length ? 'A tie on steps.' : `${name(fa.length < fb.length ? s.raceA : s.raceB)} finished first — ${Math.abs(fa.length - fb.length)} fewer steps.`}</Notice>}
+    </div>
+  );
+}
+
+/* ---------- Compare ---------- */
+function Compare() {
+  const [n, setN] = useState(32);
+  const [tip, setTip] = useState<string | null>(null);
+  const sorts = SORTS;
+  const data = useMemo(() => PRESETS.map(([k, label]) => ({ k, label, input: makeInput(n, k, mulberry(11)) })), [n]);
+  const results = useMemo(() => sorts.map((a) => ({ a, counts: data.map((d) => run(a.key, d.input).at(-1)!.comparisons) })), [data, sorts]);
+  const max = Math.max(...results.flatMap((r) => r.counts));
+  const nn = n * n, nlogn = Math.round(n * Math.log2(n));
+  return (
+    <div className="stack">
+      <PageHead eyebrow="Compare" title={<>Comparisons <em>by input shape.</em></>} description={`Measured by running each algorithm on ${n} values. For reference: n² = ${nn.toLocaleString()}, n log₂ n ≈ ${nlogn.toLocaleString()}.`} actions={<Field label="n">{(p) => <select {...p} value={n} onChange={(e) => setN(Number(e.target.value))}>{[16, 32, 64].map((v) => <option key={v}>{v}</option>)}</select>}</Field>} />
+      <section className="card stack" aria-labelledby="cmp-t">
+        <h2 id="cmp-t" className="h3">Comparisons made</h2>
+        <div className="cmp-grid" onMouseLeave={() => setTip(null)}>
+          <span />{data.map((d) => <span key={d.k} className="cmp-h small">{d.label}</span>)}
+          {results.map((r) => (
+            <div key={r.a.key} className="cmp-row">
+              <span className="cmp-name">{r.a.name}</span>
+              {r.counts.map((c, k) => { const text = `${r.a.name}, ${data[k].label}: ${c.toLocaleString()} comparisons`; return <span key={k} className="cmp-cell" tabIndex={0} aria-label={text} onMouseEnter={() => setTip(text)} onFocus={() => setTip(text)} onBlur={() => setTip(null)}><span className="cmp-bar" style={{ width: `${(c / max) * 100}%` }} /><span className="mono small">{c.toLocaleString()}</span></span>; })}
+            </div>
+          ))}
+        </div>
+        <p className="small" aria-live="polite">{tip ?? 'Bar length is relative to the largest count in the table.'}</p>
+      </section>
+      <div className="card">
+        <div className="table-wrap"><table className="table">
+          <caption className="sr-only">Complexity of each algorithm</caption>
+          <thead><tr><th scope="col">Algorithm</th><th scope="col">Best</th><th scope="col">Average</th><th scope="col">Worst</th><th scope="col">Extra space</th><th scope="col">Stable</th></tr></thead>
+          <tbody>{ALGOS.map((a) => <tr key={a.key}><th scope="row">{a.name}</th><td>{a.best}</td><td>{a.average}</td><td>{a.worst}</td><td>{a.space}</td><td>{a.stable == null ? '—' : a.stable ? 'Yes' : 'No'}</td></tr>)}</tbody>
+        </table></div>
+      </div>
+    </div>
+  );
+}
